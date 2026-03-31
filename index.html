@@ -637,27 +637,11 @@ function renderOnset(){
   return wrap;
 }
 
-function renderBMI(){
-  const wrap=div('');
-  const grid=div('bmi-grid');
-  // Height
-  const hf=div('bmi-field');
-  const hlbl=document.createElement('label');hlbl.className='bmi-lbl';hlbl.textContent='Рост';
-  const hinp=document.createElement('input');hinp.type='number';hinp.className='bmi-input';hinp.min=100;hinp.max=250;hinp.placeholder='170';
-  hinp.value=S.answers.height_cm||'';
-  hinp.oninput=e=>{S.answers.height_cm=e.target.value;render();};
-  const hunit=document.createElement('span');hunit.className='bmi-unit';hunit.textContent='см';
-  hf.append(hlbl,hinp,hunit);
-  // Weight
-  const wf=div('bmi-field');
-  const wlbl=document.createElement('label');wlbl.className='bmi-lbl';wlbl.textContent='Масса тела';
-  const winp=document.createElement('input');winp.type='number';winp.className='bmi-input';winp.min=30;winp.max=300;winp.placeholder='75';
-  winp.value=S.answers.weight_kg||'';
-  winp.oninput=e=>{S.answers.weight_kg=e.target.value;render();};
-  const wunit=document.createElement('span');wunit.className='bmi-unit';wunit.textContent='кг';
-  wf.append(wlbl,winp,wunit);
-  grid.append(hf,wf); wrap.appendChild(grid);
-
+// Partial update — only BMI result block, no full render()
+function updateBMIDisplay(){
+  const block=document.getElementById('bmi-display');
+  if(!block)return;
+  block.innerHTML='';
   const bmi=calcBMI(S.answers.height_cm,S.answers.weight_kg);
   if(bmi){
     const cat=bmiCat(bmi);
@@ -669,14 +653,41 @@ function renderBMI(){
     const idealMin=Math.round(18.5*(h_/100)**2);
     const idealMax=Math.round(24.9*(h_/100)**2);
     extra.textContent=`Идеальный диапазон: ${idealMin}–${idealMax} кг`;
-    res.append(val,catLbl,extra); wrap.appendChild(res);
-    if(bmi>=40){const w=div('warn warn-r');w.innerHTML='⚠️ Морбидное ожирение. Максимальная доза тенектеплазы (25 мг) актуальна. Повышен операционный риск.';wrap.appendChild(w);}
-    else if(bmi>=30){const w=div('warn warn-a');w.innerHTML='⚠️ Ожирение. Контролировать дозу препаратов по фактической массе тела.';wrap.appendChild(w);}
+    res.append(val,catLbl,extra); block.appendChild(res);
+    if(bmi>=40){const w=div('warn warn-r');w.innerHTML='⚠️ Морбидное ожирение. Максимальная доза тенектеплазы (25 мг) актуальна. Повышен операционный риск.';block.appendChild(w);}
+    else if(bmi>=30){const w=div('warn warn-a');w.innerHTML='⚠️ Ожирение. Контролировать дозу препаратов по фактической массе тела.';block.appendChild(w);}
   } else {
     const note=div(''); note.style.cssText='color:var(--t3);font-size:13px;text-align:center;padding:12px 0;';
     note.textContent='Введите рост и массу тела для расчёта ИМТ (поле необязательное)';
-    wrap.appendChild(note);
+    block.appendChild(note);
   }
+}
+
+function renderBMI(){
+  const wrap=div('');
+  const grid=div('bmi-grid');
+  // Height
+  const hf=div('bmi-field');
+  const hlbl=document.createElement('label');hlbl.className='bmi-lbl';hlbl.textContent='Рост';
+  const hinp=document.createElement('input');hinp.type='number';hinp.className='bmi-input';hinp.min=100;hinp.max=250;hinp.placeholder='170';
+  hinp.value=S.answers.height_cm||'';
+  hinp.oninput=e=>{S.answers.height_cm=e.target.value; updateBMIDisplay();};
+  const hunit=document.createElement('span');hunit.className='bmi-unit';hunit.textContent='см';
+  hf.append(hlbl,hinp,hunit);
+  // Weight
+  const wf=div('bmi-field');
+  const wlbl=document.createElement('label');wlbl.className='bmi-lbl';wlbl.textContent='Масса тела';
+  const winp=document.createElement('input');winp.type='number';winp.className='bmi-input';winp.min=30;winp.max=300;winp.placeholder='75';
+  winp.value=S.answers.weight_kg||'';
+  winp.oninput=e=>{S.answers.weight_kg=e.target.value; updateBMIDisplay();};
+  const wunit=document.createElement('span');wunit.className='bmi-unit';wunit.textContent='кг';
+  wf.append(wlbl,winp,wunit);
+  grid.append(hf,wf); wrap.appendChild(grid);
+
+  // Dynamic display zone — updated in-place by updateBMIDisplay()
+  const display=div(''); display.id='bmi-display';
+  wrap.appendChild(display);
+  updateBMIDisplay();
   return wrap;
 }
 
@@ -744,66 +755,127 @@ function renderBinary(step){
   return wrap;
 }
 
+function updateNIHSSDisplay(){
+  const numEl=document.getElementById('nihss-num');
+  const lblEl=document.getElementById('nihss-lbl');
+  const boxEl=document.getElementById('nihss-box');
+  const rangeEl=document.getElementById('nihss-range');
+  if(!numEl)return;
+  const v=parseInt(S.answers.nihss)||0;
+  const sev=nihssSev(v);
+  numEl.textContent=v; numEl.style.color=sev.c;
+  lblEl.textContent=sev.l; lblEl.style.color=sev.c;
+  boxEl.style.background=sev.bg; boxEl.style.borderColor=sev.bc;
+  if(rangeEl){rangeEl.style.accentColor=sev.c;}
+  // Update quick buttons
+  document.querySelectorAll('.nihss-qbtn').forEach(b=>{
+    const n=parseInt(b.dataset.n);
+    b.className='qbtn nihss-qbtn'+(n===v?' active':'');
+  });
+}
+
 function renderNIHSS(){
   const v=parseInt(S.answers.nihss)||0; const sev=nihssSev(v);
   const wrap=div('score-wrap');
-  const box=div('score-box'); box.style.background=sev.bg; box.style.borderColor=sev.bc;
-  const num=div('score-num');num.style.color=sev.c;num.textContent=v;
-  const lbl=div('score-lbl');lbl.style.color=sev.c;lbl.textContent=sev.l;
+  const box=div('score-box'); box.id='nihss-box'; box.style.background=sev.bg; box.style.borderColor=sev.bc;
+  const num=div('score-num');num.id='nihss-num';num.style.color=sev.c;num.textContent=v;
+  const lbl=div('score-lbl');lbl.id='nihss-lbl';lbl.style.color=sev.c;lbl.textContent=sev.l;
   box.append(num,lbl);
-  const r=document.createElement('input');r.type='range';r.min=0;r.max=42;r.value=v;
+  const r=document.createElement('input');r.type='range';r.id='nihss-range';r.min=0;r.max=42;r.value=v;
   r.style.accentColor=sev.c;r.style.width='100%';r.style.maxWidth='360px';
-  r.oninput=e=>{S.answers.nihss=parseInt(e.target.value);render();};
+  r.oninput=e=>{S.answers.nihss=parseInt(e.target.value); updateNIHSSDisplay();};
   const ticks=div('');ticks.style.cssText='display:flex;justify-content:space-between;color:var(--t3);font-size:10px;width:100%;max-width:360px;';
   [0,10,20,30,42].forEach(n=>{const s=document.createElement('span');s.textContent=n;ticks.appendChild(s);});
   const qrow=div('quick-row');
-  NIHSS_QUICK.forEach(n=>{const b=btn('qbtn'+(v===n?' active':''),String(n),()=>{S.answers.nihss=n;render();});qrow.appendChild(b);});
+  NIHSS_QUICK.forEach(n=>{
+    const b=btn('qbtn nihss-qbtn'+(v===n?' active':''),String(n),()=>{
+      S.answers.nihss=n;
+      const rng=document.getElementById('nihss-range');if(rng)rng.value=n;
+      updateNIHSSDisplay();
+    });
+    b.dataset.n=n;
+    qrow.appendChild(b);
+  });
   wrap.append(box,r,ticks,qrow); return wrap;
+}
+
+function updateBPDisplay(){
+  const sys=parseInt(S.answers.bp_sys)||140, dia=parseInt(S.answers.bp_dia)||85;
+  const st=bpStatus(sys,dia);
+  const svEl=document.getElementById('bp-sys-val');
+  const dvEl=document.getElementById('bp-dia-val');
+  const slEl=document.getElementById('bp-status-lbl');
+  const boxEl=document.getElementById('bp-box');
+  const warnEl=document.getElementById('bp-warn');
+  const r1=document.getElementById('bp-r1'), r2=document.getElementById('bp-r2');
+  if(!svEl)return;
+  svEl.textContent=sys; svEl.style.color=st.c;
+  dvEl.textContent=dia; dvEl.style.color=st.c;
+  slEl.textContent=st.l; slEl.style.color=st.c;
+  boxEl.style.background=st.bg; boxEl.style.borderColor=st.bc;
+  if(r1){r1.style.accentColor=st.c;} if(r2){r2.style.accentColor=st.c;}
+  if(warnEl){
+    if(sys>185||dia>110){warnEl.className='warn warn-r';warnEl.style.display='';warnEl.innerHTML='⚠️ Снизить лабеталолом или никардипином IV. Тромболизис только после нормализации АД.';}
+    else{warnEl.style.display='none';}
+  }
 }
 
 function renderBP(){
   const sys=parseInt(S.answers.bp_sys)||140,dia=parseInt(S.answers.bp_dia)||85;
   const st=bpStatus(sys,dia);
   const wrap=div('');
-  const box=div('bp-box');box.style.background=st.bg;box.style.borderColor=st.bc;
+  const box=div('bp-box');box.id='bp-box';box.style.background=st.bg;box.style.borderColor=st.bc;
   const nums=div('bp-nums');
-  const sv=div('bp-val');sv.style.color=st.c;sv.textContent=sys;
+  const sv=div('bp-val');sv.id='bp-sys-val';sv.style.color=st.c;sv.textContent=sys;
   const sep=div('bp-sep');sep.textContent='/';
-  const dv=div('bp-val');dv.style.color=st.c;dv.textContent=dia;
+  const dv=div('bp-val');dv.id='bp-dia-val';dv.style.color=st.c;dv.textContent=dia;
   const un=div('bp-unit');un.textContent='мм рт. ст.';
   nums.append(sv,sep,dv,un);
-  const sl=div('bp-status');sl.style.color=st.c;sl.textContent=st.l;
+  const sl=div('bp-status');sl.id='bp-status-lbl';sl.style.color=st.c;sl.textContent=st.l;
   box.append(nums,sl);
   const srow=div('sliders-row');
   const sg=div('sl-group');
   const sl1=document.createElement('label');sl1.className='sl-lbl';sl1.textContent='СИСТОЛИЧЕСКОЕ';
-  const r1=document.createElement('input');r1.type='range';r1.min=80;r1.max=240;r1.value=sys;
-  r1.style.accentColor=st.c;r1.oninput=e=>{S.answers.bp_sys=parseInt(e.target.value);render();};
+  const r1=document.createElement('input');r1.type='range';r1.id='bp-r1';r1.min=80;r1.max=240;r1.value=sys;
+  r1.style.accentColor=st.c;r1.oninput=e=>{S.answers.bp_sys=parseInt(e.target.value); updateBPDisplay();};
   const t1=div('sl-range');t1.innerHTML='<span>80</span><span>240</span>';
   sg.append(sl1,r1,t1);
   const dg=div('sl-group');
   const sl2=document.createElement('label');sl2.className='sl-lbl';sl2.textContent='ДИАСТОЛИЧЕСКОЕ';
-  const r2=document.createElement('input');r2.type='range';r2.min=50;r2.max=140;r2.value=dia;
-  r2.style.accentColor=st.c;r2.oninput=e=>{S.answers.bp_dia=parseInt(e.target.value);render();};
+  const r2=document.createElement('input');r2.type='range';r2.id='bp-r2';r2.min=50;r2.max=140;r2.value=dia;
+  r2.style.accentColor=st.c;r2.oninput=e=>{S.answers.bp_dia=parseInt(e.target.value); updateBPDisplay();};
   const t2=div('sl-range');t2.innerHTML='<span>50</span><span>140</span>';
   dg.append(sl2,r2,t2);
   srow.append(sg,dg);
   wrap.append(box,srow);
-  if(sys>185||dia>110){const w=div('warn warn-r');w.innerHTML='⚠️ Снизить лабеталолом или никардипином IV. Тромболизис только после нормализации АД.';wrap.appendChild(w);}
+  const warn=div('warn warn-r');warn.id='bp-warn';
+  warn.innerHTML='⚠️ Снизить лабеталолом или никардипином IV. Тромболизис только после нормализации АД.';
+  if(!(sys>185||dia>110))warn.style.display='none';
+  wrap.appendChild(warn);
   return wrap;
 }
 
+function updateGlucoseDisplay(){
+  const block=document.getElementById('glucose-display');
+  if(!block)return;
+  block.innerHTML='';
+  const gl=parseFloat(S.answers.glucose);
+  if(isNaN(gl)||S.answers.glucose===''){return;}
+  if(gl<3.3){const w=div('warn warn-r');w.innerHTML='⚠️ Гипогликемия — немедленная коррекция. Исключить как причину симптомов.';block.appendChild(w);}
+  else if(gl>10){const w=div('warn warn-a');w.innerHTML='⚠️ Гипергликемия — инсулин при > 10 ммоль/л. Цель: 4–10 ммоль/л.';block.appendChild(w);}
+  else{const w=div('warn warn-g');w.innerHTML='✓ Глюкоза в норме';block.appendChild(w);}
+}
+
 function renderGlucose(){
-  const gl=parseFloat(S.answers.glucose)||5.8;
   const wrap=div('num-wrap');
   const inp=document.createElement('input');inp.type='number';inp.min=1;inp.max=30;inp.step=0.1;
   inp.value=S.answers.glucose||'';inp.placeholder='5.8';
-  inp.oninput=e=>{S.answers.glucose=e.target.value;render();};
+  inp.oninput=e=>{S.answers.glucose=e.target.value; updateGlucoseDisplay();};
   const u=div('num-unit');u.textContent='ммоль/л';
   wrap.append(inp,u);
-  if(gl<3.3){const w=div('warn warn-r');w.innerHTML='⚠️ Гипогликемия — немедленная коррекция. Исключить как причину симптомов.';wrap.appendChild(w);}
-  else if(gl>10){const w=div('warn warn-a');w.innerHTML='⚠️ Гипергликемия — инсулин при > 10 ммоль/л. Цель: 4–10 ммоль/л.';wrap.appendChild(w);}
-  else{const w=div('warn warn-g');w.innerHTML='✓ Глюкоза в норме';wrap.appendChild(w);}
+  const display=div('');display.id='glucose-display';
+  wrap.appendChild(display);
+  updateGlucoseDisplay();
   return wrap;
 }
 
@@ -823,20 +895,45 @@ function renderChecklist(){
   return list;
 }
 
+function updateASPECTSDisplay(){
+  const numEl=document.getElementById('asp-num');
+  const lblEl=document.getElementById('asp-lbl');
+  const boxEl=document.getElementById('asp-box');
+  const rangeEl=document.getElementById('asp-range');
+  if(!numEl)return;
+  const v=parseInt(S.answers.aspects)??10;
+  const sev=aspectsSev(v);
+  numEl.textContent=v; numEl.style.color=sev.c;
+  lblEl.textContent=sev.l; lblEl.style.color=sev.c;
+  boxEl.style.background=sev.bg; boxEl.style.borderColor=sev.bc;
+  if(rangeEl)rangeEl.style.accentColor=sev.c;
+  document.querySelectorAll('.asp-qbtn').forEach(b=>{
+    const n=parseInt(b.dataset.n);
+    b.className='qbtn asp-qbtn'+(n===v?' active':'');
+  });
+}
+
 function renderAspects(){
   const v=parseInt(S.answers.aspects)??10; const sev=aspectsSev(v);
   const wrap=div('score-wrap');
-  const box=div('score-box');box.style.background=sev.bg;box.style.borderColor=sev.bc;
-  const num=div('score-num');num.style.color=sev.c;num.textContent=v;
-  const lbl=div('score-lbl');lbl.style.color=sev.c;lbl.textContent=sev.l;
+  const box=div('score-box');box.id='asp-box';box.style.background=sev.bg;box.style.borderColor=sev.bc;
+  const num=div('score-num');num.id='asp-num';num.style.color=sev.c;num.textContent=v;
+  const lbl=div('score-lbl');lbl.id='asp-lbl';lbl.style.color=sev.c;lbl.textContent=sev.l;
   box.append(num,lbl);
-  const r=document.createElement('input');r.type='range';r.min=0;r.max=10;r.value=v;
+  const r=document.createElement('input');r.type='range';r.id='asp-range';r.min=0;r.max=10;r.value=v;
   r.style.accentColor=sev.c;r.style.width='100%';r.style.maxWidth='340px';
-  r.oninput=e=>{S.answers.aspects=parseInt(e.target.value);render();};
+  r.oninput=e=>{S.answers.aspects=parseInt(e.target.value); updateASPECTSDisplay();};
   const ticks=div('');ticks.style.cssText='display:flex;justify-content:space-between;color:var(--t3);font-size:10px;width:100%;max-width:340px;';
   [0,2,4,6,8,10].forEach(n=>{const s=document.createElement('span');s.textContent=n;ticks.appendChild(s);});
   const qrow=div('quick-row');
-  [0,1,2,3,4,5,6,7,8,9,10].forEach(n=>{const b=btn('qbtn'+(v===n?' active':''),String(n),()=>{S.answers.aspects=n;render();});qrow.appendChild(b);});
+  [0,1,2,3,4,5,6,7,8,9,10].forEach(n=>{
+    const b=btn('qbtn asp-qbtn'+(v===n?' active':''),String(n),()=>{
+      S.answers.aspects=n;
+      const rng=document.getElementById('asp-range');if(rng)rng.value=n;
+      updateASPECTSDisplay();
+    });
+    b.dataset.n=n; qrow.appendChild(b);
+  });
   const note=div('');note.style.cssText='color:var(--t3);font-size:11px;text-align:center;margin-top:3px;';
   note.textContent='Зоны: C · L · IC · M1 · M2 · M3 · M4 · M5 · M6 · MCA';
   wrap.append(box,r,ticks,qrow,note); return wrap;
